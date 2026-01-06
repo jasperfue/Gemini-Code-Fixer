@@ -1,0 +1,12 @@
+.idea/
+*.iml
+*.iws
+
+.vscode/
+
+.DS_Store
+Thumbs.db
+
+node_modules/
+package-lock.json
+yarn.lock
