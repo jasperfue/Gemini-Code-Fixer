@@ -1,0 +1,22 @@
+{
+  "name": "gemini-code-fixer",
+  "version": "1.0.0",
+  "description": "A browser extension for better code highlighting in Google Gemini.",
+  "main": "content.js",
+  "scripts": {
+    "format": "prettier --write .",
+    "check": "prettier --check ."
+  },
+  "keywords": [
+    "gemini",
+    "syntax-highlighting",
+    "extension",
+    "developer-tools"
+  ],
+  "author": "Jasper Fülle",
+  "license": "MIT",
+  "packageManager": "pnpm@10.14.0",
+  "devDependencies": {
+    "prettier": "^3.7.4"
+  }
+}
