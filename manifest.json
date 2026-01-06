@@ -2,14 +2,24 @@
   "manifest_version": 3,
   "name": "Gemini Code Fixer",
   "version": "1.0",
-  "description": "Highlight code blocks on Gemini pages for better readability.",
-  "permissions": ["scripting"],
+  "permissions": ["storage", "activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["*://gemini.google.com/*"],
-      "js": ["highlight.min.js", "content.js"],
-      "css": ["atom-one-dark.min.css"]
+      "js": ["lib/highlight.min.js", "content.js"]
     }
   ],
-  "host_permissions": ["*://gemini.google.com/*"]
+  "web_accessible_resources": [
+    {
+      "resources": ["themes/*.css"],
+      "matches": ["*://gemini.google.com/*"]
+    }
+  ]
 }
