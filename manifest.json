@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Code Fixer",
+  "version": "1.0",
+  "description": "Highlight code blocks on Gemini pages for better readability.",
+  "permissions": ["scripting"],
+  "content_scripts": [
+    {
+      "matches": ["*://gemini.google.com/*"],
+      "js": ["highlight.min.js", "content.js"],
+      "css": ["atom-one-dark.min.css"]
+    }
+  ],
+  "host_permissions": ["*://gemini.google.com/*"]
+}
