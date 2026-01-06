@@ -18,7 +18,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["themes/*.css"],
+      "resources": ["themes/*.css", "worker.js", "lib/highlight.min.js"],
       "matches": ["*://gemini.google.com/*"]
     }
   ]

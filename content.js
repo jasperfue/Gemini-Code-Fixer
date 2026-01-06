@@ -2,21 +2,61 @@ let isEnabled = true;
 let currentTheme = 'default';
 let activeThemeBackground = '';
 let activeThemeColor = '';
-
-// Performance: Store the timeout ID for debouncing
 let debounceTimer = null;
 
-/**
- * UTILITY: Debounce function
- * Prevents the highlighter from running 100x per second during streaming.
- * It waits until the DOM has stopped changing for a specific delay (e.g., 100ms).
- */
+// --- WORKER SETUP ---
+
+// Initialize the worker immediately
+const workerURL = chrome.runtime.getURL('worker.js');
+const highlightWorker = new Worker(workerURL);
+
+// Listen for results from the worker
+highlightWorker.onmessage = (event) => {
+    const { id, html, success } = event.data;
+
+    // Find the DOM element waiting for this result
+    const codeElement = document.querySelector(`code[data-hl-id="${id}"]`);
+
+    if (codeElement && success) {
+        // Apply the highlighted HTML
+        codeElement.innerHTML = html;
+
+        // Add class for styling
+        codeElement.classList.add('hljs');
+
+        // Mark the parent block as fully processed/styled
+        const block = codeElement.closest('pre');
+        if (block) {
+            // Re-apply container styles now that we have content
+            const container = block.closest('.formatted-code-block-internal-container');
+            if (container) {
+                applyContainerStyles(container);
+                stripAngularAttributes(container);
+            }
+            // Mark as done so we don't send it to the worker again
+            block.dataset.processed = "yes";
+
+            // Remove the loading state (optional, if you added one)
+            codeElement.style.opacity = '1';
+        }
+    }
+};
+
+// --- UTILS ---
+
 function debounce(func, delay) {
     return function (...args) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => func.apply(this, args), delay);
     };
 }
+
+// Generate a simple unique ID
+function uuid() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// --- MAIN LOGIC ---
 
 async function updateTheme(themeName) {
     const oldStyle = document.getElementById('gemini-hl-style');
@@ -49,60 +89,59 @@ async function updateTheme(themeName) {
         // Inject global overrides to reset Gemini's default pre/code styling
         // allowing the injected theme to take precedence.
         style.textContent += `
-      pre {
-         background-color: transparent !important;
-         border: none !important;
-         margin: 0 !important;
-         padding: 0 !important;
-      }
-      code.hljs {
-         font-family: 'Fira Code', 'Consolas', monospace !important;
-         display: block !important;
-         overflow-x: auto !important;
-         background-color: transparent !important; 
-         padding: 1em !important;
-         border-radius: 0 !important;
-      }
-    `;
-
+          pre { background-color: transparent !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+          code.hljs { font-family: 'Fira Code', 'Consolas', monospace !important; display: block !important; overflow-x: auto !important; background-color: transparent !important; padding: 1em !important; border-radius: 0 !important; }
+        `;
         document.head.appendChild(style);
 
-        // Trigger immediately after theme change
+        // Force re-check
         highlightCodeBlocks();
-
-    } catch (err) {
-        console.error("Gemini Highlighter: Failed to load theme.", err);
-    }
+    } catch (err) { console.error(err); }
 }
 
 function highlightCodeBlocks() {
     if (!isEnabled) return;
 
-    // Performance optimization:
-    // We limit the scope to 'pre' tags that lack our 'processed' flag.
-    // This reduces the workload significantly on large pages.
+    // Select unprocessed blocks
     const codeBlocks = document.querySelectorAll('pre:not([data-processed="yes"])');
 
-    if (codeBlocks.length === 0) return;
-
     codeBlocks.forEach((block) => {
-        const codeElement = block.querySelector('code');
+        // Check if we already assigned an ID (pending state)
+        let codeElement = block.querySelector('code');
+        if (!codeElement) return;
 
-        if (codeElement && codeElement.textContent.trim().length > 0) {
+        // Check content
+        const textContent = codeElement.textContent;
+        if (!textContent.trim()) return;
 
-            codeElement.className = 'hljs';
-            hljs.highlightElement(codeElement);
+        // If already has an ID, it means it's currently being processed by the worker.
+        // However, if the text changed (Gemini streaming), we might need to update.
+        // For simplicity with streaming: We simply check if it has an ID.
+        // If we want to support live streaming updates perfectly, we'd update the worker.
+        // Given our debounce, we treat each debounce cycle as a "fresh" look.
 
-            // Find Gemini's internal wrapper container to apply the background color
-            const container = block.closest('.formatted-code-block-internal-container');
-
-            if (container) {
-                applyContainerStyles(container);
-                stripAngularAttributes(container);
-            }
-
-            block.dataset.processed = "yes";
+        let id = codeElement.dataset.hlId;
+        if (!id) {
+            id = uuid();
+            codeElement.dataset.hlId = id;
         }
+
+        // Attempt to guess language from Gemini header
+        let languageHint = null;
+        const headerSpan = block.closest('.code-block')?.querySelector('.code-block-decoration span');
+        if (headerSpan) {
+            languageHint = headerSpan.textContent.trim().toLowerCase();
+        }
+
+        // Send job to worker
+        highlightWorker.postMessage({
+            id: id,
+            code: textContent,
+            language: languageHint
+        });
+
+        // Note: We do NOT set block.dataset.processed = "yes" here immediately.
+        // We wait for the worker to reply (in onmessage).
     });
 }
 
@@ -141,9 +180,7 @@ function stripAngularAttributes(element) {
     if (!element) return;
     const attributes = Array.from(element.attributes);
     attributes.forEach(attr => {
-        if (attr.name.startsWith('_ng')) {
-            element.removeAttribute(attr.name);
-        }
+        if (attr.name.startsWith('_ng')) element.removeAttribute(attr.name);
     });
 }
 
@@ -158,7 +195,6 @@ chrome.storage.local.get(['enabled', 'theme'], (result) => {
     }
 });
 
-// Watch for setting changes from the popup
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
         if (changes.enabled) {
@@ -167,19 +203,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
         }
         if (changes.theme) {
             currentTheme = changes.theme.newValue;
-            document.querySelectorAll('pre').forEach(b => b.removeAttribute('data-processed'));
+            // Reset processed flags to force re-highlighting
+            document.querySelectorAll('pre').forEach(b => {
+                b.removeAttribute('data-processed');
+                const code = b.querySelector('code');
+                if(code) code.removeAttribute('data-hl-id'); // Clear ID to force new worker job
+            });
             updateTheme(currentTheme);
         }
     }
 });
 
-// PERFORMANCE FIX: Debounced Observer
-// The observer now calls the debounced version of our function.
-// It waits for 150ms of silence before running.
-// This prevents lag while Gemini streams the text rapidly.
+// Debounce: Wait 150ms after DOM changes stop before triggering the worker
 const debouncedHighlight = debounce(highlightCodeBlocks, 150);
 
-const observer = new MutationObserver((mutations) => {
+const observer = new MutationObserver(() => {
     if (!isEnabled) return;
     debouncedHighlight();
 });
