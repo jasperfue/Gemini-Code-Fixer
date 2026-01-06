@@ -3,10 +3,21 @@ let currentTheme = 'default';
 let activeThemeBackground = '';
 let activeThemeColor = '';
 
+// Performance: Store the timeout ID for debouncing
+let debounceTimer = null;
+
 /**
- * Fetches the selected CSS theme, extracts colors for the container/header,
- * and injects the styles with '!important' to override Gemini's default styling.
+ * UTILITY: Debounce function
+ * Prevents the highlighter from running 100x per second during streaming.
+ * It waits until the DOM has stopped changing for a specific delay (e.g., 100ms).
  */
+function debounce(func, delay) {
+    return function (...args) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
 async function updateTheme(themeName) {
     const oldStyle = document.getElementById('gemini-hl-style');
     if (oldStyle) oldStyle.remove();
@@ -56,31 +67,29 @@ async function updateTheme(themeName) {
 
         document.head.appendChild(style);
 
-        // Trigger re-render to apply extracted colors immediately
-        setTimeout(highlightCodeBlocks, 50);
+        // Trigger immediately after theme change
+        highlightCodeBlocks();
 
     } catch (err) {
         console.error("Gemini Highlighter: Failed to load theme.", err);
     }
 }
 
-/**
- * Main logic loop: Finds code blocks, applies syntax highlighting,
- * and fixes container/header styling.
- */
 function highlightCodeBlocks() {
     if (!isEnabled) return;
 
-    const codeBlocks = document.querySelectorAll('pre');
+    // Performance optimization:
+    // We limit the scope to 'pre' tags that lack our 'processed' flag.
+    // This reduces the workload significantly on large pages.
+    const codeBlocks = document.querySelectorAll('pre:not([data-processed="yes"])');
+
+    if (codeBlocks.length === 0) return;
 
     codeBlocks.forEach((block) => {
-        // Skip if already processed to save performance
-        if (block.dataset.processed === "yes") return;
-
         const codeElement = block.querySelector('code');
-        if (codeElement) {
 
-            // Apply Highlight.js
+        if (codeElement && codeElement.textContent.trim().length > 0) {
+
             codeElement.className = 'hljs';
             hljs.highlightElement(codeElement);
 
@@ -97,9 +106,6 @@ function highlightCodeBlocks() {
     });
 }
 
-/**
- * Applies the extracted theme colors to the container and the header.
- */
 function applyContainerStyles(container) {
     if (!activeThemeBackground) return;
 
@@ -122,23 +128,15 @@ function applyContainerStyles(container) {
 
             // Style the language label specifically
             const langSpan = header.querySelector('span');
-            if (langSpan) {
-                langSpan.style.setProperty('color', activeThemeColor, 'important');
-            }
+            if (langSpan) langSpan.style.setProperty('color', activeThemeColor, 'important');
 
             // Style Material Icons (e.g., Copy button)
             const icons = header.querySelectorAll('mat-icon');
-            icons.forEach(icon => {
-                icon.style.setProperty('color', activeThemeColor, 'important');
-            });
+            icons.forEach(icon => icon.style.setProperty('color', activeThemeColor, 'important'));
         }
     }
 }
 
-/**
- * Removes Angular's _ngcontent attributes to break style isolation,
- * allowing our CSS to override Gemini's defaults easily.
- */
 function stripAngularAttributes(element) {
     if (!element) return;
     const attributes = Array.from(element.attributes);
@@ -157,8 +155,6 @@ chrome.storage.local.get(['enabled', 'theme'], (result) => {
 
     if (isEnabled) {
         updateTheme(currentTheme);
-        // Fallback interval to catch nodes that MutationObserver might miss during heavy streaming
-        setInterval(highlightCodeBlocks, 1000);
     }
 });
 
@@ -171,15 +167,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
         }
         if (changes.theme) {
             currentTheme = changes.theme.newValue;
-            // Reset processed flag to force re-highlighting
-            document.querySelectorAll('pre').forEach(b => b.dataset.processed = "");
+            document.querySelectorAll('pre').forEach(b => b.removeAttribute('data-processed'));
             updateTheme(currentTheme);
         }
     }
 });
 
-// Observe DOM changes (Gemini streaming responses)
-const observer = new MutationObserver(() => {
-    if (isEnabled) highlightCodeBlocks();
+// PERFORMANCE FIX: Debounced Observer
+// The observer now calls the debounced version of our function.
+// It waits for 150ms of silence before running.
+// This prevents lag while Gemini streams the text rapidly.
+const debouncedHighlight = debounce(highlightCodeBlocks, 150);
+
+const observer = new MutationObserver((mutations) => {
+    if (!isEnabled) return;
+    debouncedHighlight();
 });
+
 observer.observe(document.body, { childList: true, subtree: true });
