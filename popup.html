@@ -1,33 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <style>
-        body { width: 200px; padding: 10px; font-family: sans-serif; }
-        .row { margin-bottom: 10px; }
-        label { display: block; margin-bottom: 5px; }
-        select, button { width: 100%; }
-    </style>
+    <meta charset="UTF-8">
+    <title>Gemini Code Fixer</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-<h3>Gemini Settings</h3>
 
-<div class="row">
-    <label>
-        <input type="checkbox" id="enableToggle"> Extension aktiv
-    </label>
+<div class="container">
+    <header>
+        <div class="title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <h2>Gemini <span class="accent">Code Fixer</span></h2>
+        </div>
+        <div class="version">v1.0</div>
+    </header>
+
+    <div class="card">
+        <div class="control-row">
+            <div class="label-group">
+                <label for="enableToggle">Enable Extension</label>
+                <span class="sub-label">Toggle syntax highlighting</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="enableToggle">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <hr class="divider">
+
+        <div class="control-row vertical">
+            <label for="themeSelect">Select Theme</label>
+            <div class="select-wrapper">
+                <select id="themeSelect">
+                    <option value="vs2015.min">VS Code Dark</option>
+                    <option value="atom-one-dark.min">Atom One Dark</option>
+
+                    <option value="tokyo-night-dark.min">Tokyo Night</option>
+                    <option value="night-owl.min">Night Owl</option>
+                    <option value="dracula.min">Dracula</option>
+                    <option value="nord.min">Nord</option>
+
+                    <option value="monokai.min">Monokai</option>
+                    <option value="gruvbox-dark-medium.min">Gruvbox Dark</option>
+                    <option value="solarized-dark.min">Solarized Dark</option>
+
+                    <option value="github.min">GitHub Light</option>
+                    <option value="solarized-light.min">Solarized Light</option>
+                    <option value="stackoverflow-light.min">StackOverflow Light</option>
+
+                    <option value="github-dark.min">GitHub Dark</option>
+                    <option value="a11y-dark.min">High Contrast (A11y)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div id="status">Ready</div>
+
+        <a href="https://github.com/jasperfue/Gemini-Code-Fixer" target="_blank" class="repo-link">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+            </svg>
+            <span>Star on GitHub</span>
+        </a>
+    </footer>
 </div>
-
-<div class="row">
-    <label for="themeSelect">Theme wählen:</label>
-    <select id="themeSelect">
-        <option value="default.min">Default</option>
-        <option value="atom-one-dark.min">Atom One Dark</option>
-        <option value="github.min">GitHub</option>
-        <option value="intellij-light.min">IntelliJ light</option>
-    </select>
-</div>
-
-<div id="status" style="color: green; font-size: 0.8em;"></div>
 
 <script src="popup.js"></script>
 </body>
